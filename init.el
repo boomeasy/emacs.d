@@ -8,10 +8,14 @@
 
 ;; -------------------------------------------------------------------------------
 ;; windows like select and cut/paste
+;; https://groups.google.com/forum/#!topic/gnu.emacs.help/79N51n6NUfs
+;; this must be above the cua-mode t:
+(setq cua-remap-control-z nil) 
 (cua-mode t) 
 (setq cua-auto-tabify-rectangles nil) ;; Don't tabify after rectangle commands
 (transient-mark-mode 1) ;; No region when it is not highlighted
-(setq cua-keep-region-after-copy nil) ;; Standard Windows behaviour
+;;(setq cua-keep-region-after-copy nil) ;; Standard Windows behaviour
+
 ;; problem is that ctrl-z no longer works.  ctrl-c ctrl-z:
 ;; -------------------------------------------------------------------------------
 ;; my key-bindings
@@ -72,6 +76,8 @@
 (setq backup-directory-alist `(("." . "~/.emacs-backups/backups")) ) ; which directory to put backups file
 (setq vc-follow-symlinks t )       ; don't ask for confirmation when opening symlinked file
 (setq auto-save-file-name-transforms '((".*" "~/.emacs-backups/auto-save-list/" t)) ) ;transform backups file name
+;; does this prevent ~/.emacs.d/auto-save-list/ from being created?  hope so.
+(setq auto-save-list-file-prefix nil)
 (setq inhibit-startup-screen t ); inhibit useless and old-school startup screen
 (setq ring-bell-function 'ignore ); silent bell when you make a mistake
 (setq coding-system-for-read 'utf-8 ); use utf-8 by default
@@ -123,6 +129,59 @@
     (next-line)))
 ;; can't map ctrl-; :-(
 (global-set-key (kbd "M-;") 'comment-or-uncomment-region-or-line)
+
+
+;; -------------------------------------------------------------------------------
+;; make scripts executable if they start with shebang
+(defun hlu-make-script-executable ()
+  "If file starts with a shebang, make `buffer-file-name' executable"
+  (save-excursion
+    (save-restriction
+      (widen)
+      (goto-char (point-min))
+      (when (and (looking-at "^#!")
+                  (not (file-executable-p buffer-file-name)))
+        (set-file-modes buffer-file-name
+                        (logior (file-modes buffer-file-name) #o100))
+        (message (concat "Made " buffer-file-name " executable"))))))
+
+(add-hook 'after-save-hook 'hlu-make-script-executable)
+
+;; -------------------------------------------------------------------------------
+;; toggle vertical and horizontal window split
+(defun toggle-window-split ()
+  (interactive)
+  (if (= (count-windows) 2)
+      (let* ((this-win-buffer (window-buffer))
+         (next-win-buffer (window-buffer (next-window)))
+         (this-win-edges (window-edges (selected-window)))
+         (next-win-edges (window-edges (next-window)))
+         (this-win-2nd (not (and (<= (car this-win-edges)
+                     (car next-win-edges))
+                     (<= (cadr this-win-edges)
+                     (cadr next-win-edges)))))
+         (splitter
+          (if (= (car this-win-edges)
+             (car (window-edges (next-window))))
+          'split-window-horizontally
+        'split-window-vertically)))
+    (delete-other-windows)
+    (let ((first-win (selected-window)))
+      (funcall splitter)
+      (if this-win-2nd (other-window 1))
+      (set-window-buffer (selected-window) this-win-buffer)
+      (set-window-buffer (next-window) next-win-buffer)
+      (select-window first-win)
+      (if this-win-2nd (other-window 1))))))
+
+(global-set-key (kbd "C-x |") 'toggle-window-split)
+
+;; -------------------------------------------------------------------------------
+;; file registers for quick open  (C-x r j e) for quick open
+(set-register ?c '(file . "~/.ssh/config"))
+(set-register ?e '(file . "~/.emacs.d/init.el"))
+;; alt-insert to reload init file
+(global-set-key [M-insert] '(lambda() (interactive) (load-file "~/.emacs.d/init.el")))
 
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
